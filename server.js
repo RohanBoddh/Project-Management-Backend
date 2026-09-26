@@ -25,6 +25,16 @@ app.use(express.urlencoded({ extended: true }));
 // Static Upload Folder
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
+// Ensure DB connected
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+  } catch (e) {
+    // continue
+  }
+  next();
+});
+
 // CORS
 app.use(
   cors({
