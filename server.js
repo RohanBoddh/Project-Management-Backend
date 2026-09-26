@@ -28,7 +28,10 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // CORS
 app.use(
   cors({
-    origin: "http://localhost:5173", // React Vite frontend
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, server-to-server) or any localhost/vercel domain
+      callback(null, true);
+    },
     credentials: true,
   }),
 );
@@ -107,3 +110,5 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+module.exports = app;
