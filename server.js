@@ -1,3 +1,4 @@
+```js
 // ================= IMPORTS =================
 const express = require("express");
 const dotenv = require("dotenv");
@@ -12,7 +13,6 @@ const Project = require("./models/Project");
 
 // ================= CONFIG =================
 dotenv.config();
-connectDB();
 
 const app = express();
 
@@ -25,26 +25,29 @@ app.use(express.urlencoded({ extended: true }));
 // Static Upload Folder
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// Ensure DB connected
-app.use(async (req, res, next) => {
-  try {
-    await connectDB();
-  } catch (e) {
-    // continue
-  }
-  next();
-});
-
 // CORS
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, server-to-server) or any localhost/vercel domain
-      callback(null, true);
-    },
+    origin: true,
     credentials: true,
-  }),
+  })
 );
+
+// ================= DATABASE =================
+// Connect to MongoDB before handling requests
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error("MongoDB Connection Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Database connection failed",
+    });
+  }
+});
 
 // ================= ROUTES =================
 
@@ -62,7 +65,7 @@ app.use("/api/member", require("./routes/memberRoutes"));
 app.use("/api/testimonials", require("./routes/testimonials"));
 app.use("/api/reports", require("./routes/reportRoutes"));
 
-// ✅ WORK FLOW SYSTEM (Admin → Manager → Member)
+// Work Flow System
 app.use("/api/work", require("./routes/workRoutes"));
 
 // ================= ANALYTICS API =================
@@ -76,7 +79,6 @@ app.get(
       const totalUsers = await User.countDocuments();
       const totalProjects = await Project.countDocuments();
 
-      // Future-ready placeholder
       const activeTasks = 0;
 
       res.status(200).json({
@@ -89,24 +91,37 @@ app.get(
       });
     } catch (error) {
       console.error("Analytics Error:", error);
+
       res.status(500).json({
         success: false,
         message: "Server Error",
       });
     }
-  },
+  }
 );
 
 // ================= ROOT ROUTE =================
+
 app.get("/", (req, res) => {
   res.status(200).json({
-    message: "🚀 Project Management API Running",
+    success: true,
+    message: "Project Management API Running",
+  });
+});
+
+// ================= HEALTH CHECK =================
+
+app.get("/health", async (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Backend is healthy",
   });
 });
 
 // ================= GLOBAL ERROR HANDLER =================
+
 app.use((err, req, res, next) => {
-  console.error("Global Error:", err.stack);
+  console.error("Global Error:", err);
 
   res.status(err.statusCode || 500).json({
     success: false,
@@ -114,11 +129,31 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ================= SERVER START =================
-const PORT = process.env.PORT || 5000;
+// ================= SERVER =================
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// IMPORTANT:
+// Do NOT use app.listen() when running as a Vercel serverless function.
+//
+// Local development is handled only when running directly with:
+// node server.js
+//
+// Vercel will use the exported Express app.
 
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+
+  connectDB()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`Server running on port ${ PORT } `);
+      });
+    })
+    .catch((error) => {
+      console.error("Failed to start server:", error);
+      process.exit(1);
+    });
+}
+
+// Export Express app for Vercel
 module.exports = app;
+```

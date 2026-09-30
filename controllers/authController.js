@@ -2,10 +2,16 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-//   TOKEN  
+// =====================================================
+// GENERATE TOKEN
+// =====================================================
+
 const generateToken = (id, role) => {
   return jwt.sign(
-    { id, role },
+    {
+      id: id,
+      role: role,
+    },
     process.env.JWT_SECRET,
     {
       expiresIn: process.env.JWT_EXPIRE || "7d",
@@ -13,120 +19,300 @@ const generateToken = (id, role) => {
   );
 };
 
-//  REGISTER  
+// =====================================================
+// REGISTER
+// POST /api/auth/register
+// =====================================================
+
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const {
+      name,
+      email,
+      password,
+      role,
+      department,
+    } = req.body;
 
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !department) {
       return res.status(400).json({
-        message: "Please provide all required fields",
+        success: false,
+        message:
+          "Name, email, password and department are required",
       });
     }
 
-    // check user
-    const userExists = await User.findOne({ email });
+    const normalizedEmail = email
+      .trim()
+      .toLowerCase();
+
+    const userExists = await User.findOne({
+      email: normalizedEmail,
+    });
+
     if (userExists) {
       return res.status(400).json({
-        message: "User already exists",
+        success: false,
+        message: "Email already exists",
       });
     }
 
-    // hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(
+      password,
+      10
+    );
 
-    // ROLE FIX 
-    let userRole = "Member";
+    let userRole = "member";
 
     if (role) {
-      const r = role.toLowerCase();
+      const normalizedRole = String(role)
+        .trim()
+        .toLowerCase();
 
-      if (r === "admin") userRole = "Admin";
-      if (r === "manager") userRole = "Manager";
-      if (r === "member") userRole = "Member";
+      if (
+        ["admin", "manager", "member"].includes(
+          normalizedRole
+        )
+      ) {
+        userRole = normalizedRole;
+      }
     }
 
     const user = await User.create({
-      name,
-      email,
+      name: name.trim(),
+      email: normalizedEmail,
       password: hashedPassword,
       role: userRole,
+      department: department.trim(),
     });
 
-    const token = generateToken(user._id, user.role);
+    const token = generateToken(
+      user._id,
+      user.role
+    );
 
-    res.status(201).json({
+    return res.status(201).json({
+      success: true,
       message: "User registered successfully",
+
       token,
+
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
+        department: user.department || "",
+        phone: user.phone || "",
+        address: user.address || "",
+        photo: user.photo || "",
       },
     });
   } catch (error) {
-    console.log("REGISTER ERROR:", error);
-    res.status(500).json({
+    console.error(
+      "REGISTER ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
       message: "Server Error",
       error: error.message,
     });
   }
 };
 
-// LOGIN 
+// =====================================================
+// LOGIN
+// POST /api/auth/login
+// =====================================================
+
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    console.log(
+      "LOGIN REQUEST BODY:",
+      {
+        email: req.body?.email,
+        passwordProvided:
+          Boolean(req.body?.password),
+      }
+    );
+
+    const email = String(
+      req.body?.email || ""
+    )
+      .trim()
+      .toLowerCase();
+
+    const password = String(
+      req.body?.password || ""
+    );
+
+    // ================= VALIDATE INPUT =================
 
     if (!email || !password) {
+      console.log(
+        "LOGIN FAILED: EMAIL OR PASSWORD MISSING"
+      );
+
       return res.status(400).json({
-        message: "Please provide email and password",
+        success: false,
+        message:
+          "Email and password are required",
       });
     }
 
-    const user = await User.findOne({ email });
+    // ================= FIND USER =================
+
+    const user = await User.findOne({
+      email: email,
+    });
+
     if (!user) {
+      console.log(
+        "LOGIN FAILED: USER NOT FOUND"
+      );
+
       return res.status(400).json({
-        message: "Invalid credentials",
+        success: false,
+        message:
+          "Invalid email or password",
       });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    // ================= PASSWORD =================
+
+    if (!user.password) {
+      console.log(
+        "LOGIN FAILED: PASSWORD NOT SET"
+      );
+
+      return res.status(400).json({
+        success: false,
+        message:
+          "This account does not have a valid password",
+      });
+    }
+
+    const isMatch = await bcrypt.compare(
+      password,
+      user.password
+    );
+
     if (!isMatch) {
+      console.log(
+        "LOGIN FAILED: WRONG PASSWORD"
+      );
+
       return res.status(400).json({
-        message: "Invalid credentials",
+        success: false,
+        message:
+          "Invalid email or password",
       });
     }
 
-    const token = generateToken(user._id, user.role);
+    // ================= ROLE =================
 
-    res.json({
+    const role = String(
+      user.role || "member"
+    )
+      .trim()
+      .toLowerCase();
+
+    if (
+      !["admin", "manager", "member"].includes(
+        role
+      )
+    ) {
+      console.log(
+        "LOGIN FAILED: INVALID ROLE:",
+        user.role
+      );
+
+      return res.status(400).json({
+        success: false,
+        message:
+          "User role is not configured correctly",
+      });
+    }
+
+    // ================= TOKEN =================
+
+    const token = generateToken(
+      user._id,
+      role
+    );
+
+    console.log(
+      "LOGIN SUCCESS:",
+      email,
+      role
+    );
+
+    // ================= RESPONSE =================
+
+    return res.status(200).json({
+      success: true,
       message: "Login successful",
+
       token,
+
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role,
+        phone: user.phone || "",
+        address: user.address || "",
+        role: role,
+        department: user.department || "",
+        photo: user.photo || "",
+        isActive: user.isActive,
       },
     });
   } catch (error) {
-    console.log("LOGIN ERROR:", error);
-    res.status(500).json({
+    console.error(
+      "LOGIN ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
       message: "Server Error",
       error: error.message,
     });
   }
 };
 
-//  GET ME 
+// =====================================================
+// GET CURRENT USER
+// GET /api/auth/me
+// =====================================================
+
 exports.getMe = async (req, res) => {
   try {
-    res.status(200).json(req.user);
+    const user = await User.findById(
+      req.user.id
+    ).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      user: user,
+    });
   } catch (error) {
-    console.log("GETME ERROR:", error);
-    res.status(500).json({
+    console.error(
+      "GET ME ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
       message: "Server Error",
       error: error.message,
     });
