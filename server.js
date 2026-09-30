@@ -4,7 +4,10 @@ const cors = require("cors");
 const path = require("path");
 
 const connectDB = require("./config/db");
-const { protect, authorizeRoles } = require("./middleware/authMiddleware");
+const {
+  protect,
+  authorizeRoles,
+} = require("./middleware/authMiddleware");
 
 const User = require("./models/User");
 const Project = require("./models/Project");
@@ -25,29 +28,8 @@ const app = express();
 // CORS CONFIG
 // =====================================================
 
-const allowedOrigins = [
-  "https://project-management-frontend-cyan.vercel.app",
-  "http://localhost:5173",
-];
-
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests without Origin
-    // Example: Postman, curl, server-to-server
-    if (!origin) {
-      return callback(null, true);
-    }
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    console.log("CORS BLOCKED ORIGIN:", origin);
-
-    return callback(
-      new Error("Not allowed by CORS")
-    );
-  },
+  origin: true,
 
   credentials: true,
 
@@ -68,7 +50,6 @@ const corsOptions = {
   optionsSuccessStatus: 204,
 };
 
-// CORS MUST COME BEFORE ROUTES
 app.use(cors(corsOptions));
 
 // =====================================================
@@ -76,6 +57,7 @@ app.use(cors(corsOptions));
 // =====================================================
 
 app.use(express.json());
+
 app.use(
   express.urlencoded({
     extended: true,
@@ -115,7 +97,7 @@ app.use(async (req, res, next) => {
 });
 
 // =====================================================
-// AUTH & USERS
+// AUTH
 // =====================================================
 
 app.use(
@@ -123,13 +105,17 @@ app.use(
   require("./routes/authRoutes")
 );
 
+// =====================================================
+// USERS
+// =====================================================
+
 app.use(
   "/api/users",
   require("./routes/userRoutes")
 );
 
 // =====================================================
-// CORE MODULES
+// PROJECTS
 // =====================================================
 
 app.use(
@@ -137,15 +123,27 @@ app.use(
   require("./routes/projectRoutes")
 );
 
+// =====================================================
+// TASKS
+// =====================================================
+
 app.use(
   "/api/tasks",
   require("./routes/taskRoutes")
 );
 
+// =====================================================
+// TEAMS
+// =====================================================
+
 app.use(
   "/api/teams",
   require("./routes/teamRoutes")
 );
+
+// =====================================================
+// MEMBER
+// =====================================================
 
 app.use(
   "/api/member",
@@ -153,7 +151,7 @@ app.use(
 );
 
 // =====================================================
-// EXTRA FEATURES
+// TESTIMONIALS
 // =====================================================
 
 app.use(
@@ -161,13 +159,17 @@ app.use(
   require("./routes/testimonials")
 );
 
+// =====================================================
+// REPORTS
+// =====================================================
+
 app.use(
   "/api/reports",
   require("./routes/reportRoutes")
 );
 
 // =====================================================
-// WORK FLOW SYSTEM
+// WORK
 // =====================================================
 
 app.use(
@@ -222,8 +224,7 @@ app.get(
 app.get("/", (req, res) => {
   return res.status(200).json({
     success: true,
-    message:
-      "Project Management API Running",
+    message: "Project Management API Running",
   });
 });
 
