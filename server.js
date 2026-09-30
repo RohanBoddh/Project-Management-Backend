@@ -1,5 +1,3 @@
-```js
-// ================= IMPORTS =================
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
@@ -11,36 +9,103 @@ const { protect, authorizeRoles } = require("./middleware/authMiddleware");
 const User = require("./models/User");
 const Project = require("./models/Project");
 
-// ================= CONFIG =================
+// =====================================================
+// ENV CONFIG
+// =====================================================
+
 dotenv.config();
+
+// =====================================================
+// EXPRESS APP
+// =====================================================
 
 const app = express();
 
-// ================= MIDDLEWARE =================
+// =====================================================
+// CORS CONFIG
+// =====================================================
 
-// Body Parser
+const allowedOrigins = [
+  "https://project-management-frontend-cyan.vercel.app",
+  "http://localhost:5173",
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests without Origin
+    // Example: Postman, curl, server-to-server
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    console.log("CORS BLOCKED ORIGIN:", origin);
+
+    return callback(
+      new Error("Not allowed by CORS")
+    );
+  },
+
+  credentials: true,
+
+  methods: [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS",
+  ],
+
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+  ],
+
+  optionsSuccessStatus: 204,
+};
+
+// CORS MUST COME BEFORE ROUTES
+app.use(cors(corsOptions));
+
+// =====================================================
+// BODY PARSER
+// =====================================================
+
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Static Upload Folder
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
-// CORS
 app.use(
-  cors({
-    origin: true,
-    credentials: true,
+  express.urlencoded({
+    extended: true,
   })
 );
 
-// ================= DATABASE =================
-// Connect to MongoDB before handling requests
+// =====================================================
+// STATIC UPLOAD FOLDER
+// =====================================================
+
+app.use(
+  "/uploads",
+  express.static(
+    path.join(__dirname, "uploads")
+  )
+);
+
+// =====================================================
+// DATABASE MIDDLEWARE
+// =====================================================
+
 app.use(async (req, res, next) => {
   try {
     await connectDB();
     next();
   } catch (error) {
-    console.error("MongoDB Connection Error:", error);
+    console.error(
+      "MongoDB Connection Error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -49,26 +114,70 @@ app.use(async (req, res, next) => {
   }
 });
 
-// ================= ROUTES =================
+// =====================================================
+// AUTH & USERS
+// =====================================================
 
-// Auth & Users
-app.use("/api/auth", require("./routes/authRoutes"));
-app.use("/api/users", require("./routes/userRoutes"));
+app.use(
+  "/api/auth",
+  require("./routes/authRoutes")
+);
 
-// Core Modules
-app.use("/api/projects", require("./routes/projectRoutes"));
-app.use("/api/tasks", require("./routes/taskRoutes"));
-app.use("/api/teams", require("./routes/teamRoutes"));
-app.use("/api/member", require("./routes/memberRoutes"));
+app.use(
+  "/api/users",
+  require("./routes/userRoutes")
+);
 
-// Extra Features
-app.use("/api/testimonials", require("./routes/testimonials"));
-app.use("/api/reports", require("./routes/reportRoutes"));
+// =====================================================
+// CORE MODULES
+// =====================================================
 
-// Work Flow System
-app.use("/api/work", require("./routes/workRoutes"));
+app.use(
+  "/api/projects",
+  require("./routes/projectRoutes")
+);
 
-// ================= ANALYTICS API =================
+app.use(
+  "/api/tasks",
+  require("./routes/taskRoutes")
+);
+
+app.use(
+  "/api/teams",
+  require("./routes/teamRoutes")
+);
+
+app.use(
+  "/api/member",
+  require("./routes/memberRoutes")
+);
+
+// =====================================================
+// EXTRA FEATURES
+// =====================================================
+
+app.use(
+  "/api/testimonials",
+  require("./routes/testimonials")
+);
+
+app.use(
+  "/api/reports",
+  require("./routes/reportRoutes")
+);
+
+// =====================================================
+// WORK FLOW SYSTEM
+// =====================================================
+
+app.use(
+  "/api/work",
+  require("./routes/workRoutes")
+);
+
+// =====================================================
+// ANALYTICS
+// =====================================================
 
 app.get(
   "/api/analytics",
@@ -76,12 +185,15 @@ app.get(
   authorizeRoles("admin", "manager"),
   async (req, res) => {
     try {
-      const totalUsers = await User.countDocuments();
-      const totalProjects = await Project.countDocuments();
+      const totalUsers =
+        await User.countDocuments();
+
+      const totalProjects =
+        await Project.countDocuments();
 
       const activeTasks = 0;
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         data: {
           totalUsers,
@@ -90,9 +202,12 @@ app.get(
         },
       });
     } catch (error) {
-      console.error("Analytics Error:", error);
+      console.error(
+        "Analytics Error:",
+        error
+      );
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: "Server Error",
       });
@@ -100,60 +215,90 @@ app.get(
   }
 );
 
-// ================= ROOT ROUTE =================
+// =====================================================
+// ROOT
+// =====================================================
 
 app.get("/", (req, res) => {
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
-    message: "Project Management API Running",
+    message:
+      "Project Management API Running",
   });
 });
 
-// ================= HEALTH CHECK =================
+// =====================================================
+// HEALTH CHECK
+// =====================================================
 
-app.get("/health", async (req, res) => {
-  res.status(200).json({
+app.get("/health", (req, res) => {
+  return res.status(200).json({
     success: true,
     message: "Backend is healthy",
   });
 });
 
-// ================= GLOBAL ERROR HANDLER =================
+// =====================================================
+// 404 HANDLER
+// =====================================================
 
-app.use((err, req, res, next) => {
-  console.error("Global Error:", err);
-
-  res.status(err.statusCode || 500).json({
+app.use((req, res) => {
+  return res.status(404).json({
     success: false,
-    message: err.message || "Internal Server Error",
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
   });
 });
 
-// ================= SERVER =================
+// =====================================================
+// GLOBAL ERROR HANDLER
+// =====================================================
 
-// IMPORTANT:
-// Do NOT use app.listen() when running as a Vercel serverless function.
-//
-// Local development is handled only when running directly with:
-// node server.js
-//
-// Vercel will use the exported Express app.
+app.use(
+  (err, req, res, next) => {
+    console.error(
+      "GLOBAL ERROR:",
+      err
+    );
+
+    return res.status(
+      err.statusCode || 500
+    ).json({
+      success: false,
+      message:
+        err.message ||
+        "Internal Server Error",
+    });
+  }
+);
+
+// =====================================================
+// LOCAL DEVELOPMENT ONLY
+// =====================================================
 
 if (require.main === module) {
-  const PORT = process.env.PORT || 5000;
+  const PORT =
+    process.env.PORT || 5000;
 
   connectDB()
     .then(() => {
       app.listen(PORT, () => {
-        console.log(`Server running on port ${ PORT } `);
+        console.log(
+          `Server running on port ${PORT}`
+        );
       });
     })
     .catch((error) => {
-      console.error("Failed to start server:", error);
+      console.error(
+        "Failed to start server:",
+        error
+      );
+
       process.exit(1);
     });
 }
 
-// Export Express app for Vercel
+// =====================================================
+// EXPORT FOR VERCEL
+// =====================================================
+
 module.exports = app;
-```
